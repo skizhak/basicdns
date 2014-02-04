@@ -6,6 +6,7 @@ import dns
 import dns.name, dns.query, dns.resolver
 import dns.message, dns.rrset
 import socket
+import re
 
 def requestHandler(address, message):
     resp = None
@@ -55,6 +56,7 @@ def requestHandler(address, message):
 
     if resp:
         s.sendto(resp.to_wire(), address)
+        serving_ids.remove(message_id)
 
 
 def std_qry(msg):
@@ -99,7 +101,20 @@ def std_qry(msg):
                     
             return resp
         else:
-            return make_response(qry=msg, RCODE=2)   # RCODE =  3    Name Error
+            #return make_response(qry=msg, RCODE=2)   # RCODE =  3    Name Error
+            resp = make_response(qry=msg)
+
+            # resolve the cname and append the results as the question
+            # was rdatatype.A
+            query = dns.message.make_query(domain, dns.rdatatype.A)
+            response = dns.query.udp(query, def_ns)
+            for rrset in response.answer:
+                resp.answer.append(rrset)
+                #print rrset
+            
+            return resp
+
+
 
 
 def make_response(qry=None, id=None, RCODE=0):
@@ -123,7 +138,7 @@ def parse_record_file(file):
     with open(file, 'r') as fobj:
         for line in fobj :
             if line.rstrip() and '#' not in line[0]:
-                entry = [items for items in line.split('\t') if items is not '']
+                entry = re.findall(r"[\w\.\-]+",line)
                 key = entry[0].lower()
                 records[key] = {}
                 records[key]['type'] = entry[1]
