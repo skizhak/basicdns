@@ -1,7 +1,8 @@
+#
 # @author: sarin kizhakkepurayil
 #
-# some of the code samples taken from dnspython mail archive.
-# credits to Luca Dionisi wherever is its due
+# some of the dns message parsing code sample is taken from 
+# dnspython mail archive.credits to Luca Dionisi wherever is its due
 #
 
 import os
@@ -14,7 +15,7 @@ import threading
 from multiprocessing import Process, Queue
 from multiprocessing.reduction import reduce_handle, rebuild_handle
 import logging, logging.handlers
-
+import re
 import dns
 import dns.name, dns.query, dns.resolver
 import dns.message, dns.rrset
@@ -53,27 +54,35 @@ def parse_record_file(file):
     return records
 
 def follow_record_file(file):
+    log.debug(file)
     file.seek(0,2)
     while True:
         line = file.readline()
+        log.debug("checking.. %s" %line)
         if not line:
-            time.sleep(0.1)
+            time.sleep(10)
             continue
         yield line
 
-def watch_record_file_updates(file_name, dns_records):
+def watch_record_file_updates(file_name, new_dns_records):
+    global dns_records
     file = open(file_name, 'r')
+    log.debug(file)
     conf_lines = follow_record_file(file)
+    log.debug(conf_lines)
     for line in conf_lines:
         record = parse_conf_lines(line)
-        dns_records.update(record)
+        new_dns_records.update(record)
+    dns_records = new_dns_records
+    log.debug(new_dns_records)
 
 class WatchUpdateThread(threading.Thread):
     """docstring for WatchUpdate"""
     def __init__(self, file_name, dns_records):
-        super(WatchUpdateThread, self).__init__(self)
+        threading.Thread.__init__(self)
         self.file_name = file_name
         self.dns_records = dns_records
+        self.daemon = True
 
     def run(self):
         watch_record_file_updates(self.file_name, self.dns_records)
@@ -81,7 +90,7 @@ class WatchUpdateThread(threading.Thread):
 
 dns_rec_file = 'dns_records'
 dns_records = parse_record_file(dns_rec_file)
-watch_record_file_thread = WatchUpdateThread(1, dns_rec_file, dns_records)
+watch_record_file_thread = WatchUpdateThread(dns_rec_file, dns_records)
 watch_record_file_thread.start()
 
 def_ns = dns.resolver.get_default_resolver().nameservers[0]
@@ -96,14 +105,14 @@ def make_response(query=None, id=None, RCODE=0):
         if RCODE != 1:
             raise Exception, 'bad use of make_response'
     else:
-        resp = dns.message.make_response(qry)
+        resp = dns.message.make_response(query)
     resp.flags |= dns.flags.AA
     resp.flags |= dns.flags.RA
     resp.set_rcode(RCODE)
     return resp
 
 def resolve_query(message):
-    qs = dns_message.question
+    qs = message.question
     print str(len(qs)) + ' questions.'
 
     answers = []
@@ -114,7 +123,7 @@ def resolve_query(message):
         domain = qname.lower()
         if domain in dns_records.keys():
             print 'Found record'
-            resp = make_response(qry=dns_message)
+            resp = make_response(query=message)
             if dns_records[domain]['type'] == 'A':
                 rrset = dns.rrset.from_text(q.name, 1000,
                                             dns.rdataclass.IN, dns.rdatatype.A,
@@ -140,12 +149,12 @@ def resolve_query(message):
                     resp.answer.append(rrset)
 
             else:
-                return make_response(qry=dns_message, RCODE=3)
+                return make_response(query=message, RCODE=3)
                     
             return resp
         else:
-            #return make_response(qry=dns_message, RCODE=2)   # RCODE =  3    Name Error
-            resp = make_response(qry=dns_message)
+            #return make_response(qry=message, RCODE=2)   # RCODE =  3    Name Error
+            resp = make_response(query=message)
 
             # resolve the cname and append the results as the question
             # was rdatatype.A
@@ -189,14 +198,14 @@ def resolve_message(message):
                             resp = resolve_query(msg)
                         else:
                             # not implemented
-                            resp = self.make_response(qry=msg, RCODE=4)   # RCODE =  4    Not Implemented
+                            resp = self.make_response(query=msg, RCODE=4)   # RCODE =  4    Not Implemented
                 else:
                     # not implemented
-                    resp = self.make_response(qry=msg, RCODE=4)   # RCODE =  4    Not Implemented
+                    resp = self.make_response(query=msg, RCODE=4)   # RCODE =  4    Not Implemented
 
             except Exception, e:
                 print 'got ' + repr(e)
-                resp = self.make_response(qry=msg, RCODE=2)   # RCODE =  2    Server Error
+                resp = self.make_response(query=msg, RCODE=2)   # RCODE =  2    Server Error
                 print 'resp = ' + repr(resp.to_wire())
 
         except Exception, e:
@@ -221,10 +230,12 @@ class SocketHandler(object):
         log.debug(data)
         resp = resolve_message(data)
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        #sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        self.answer_q.put([resp, address])
         
-        sock.sendto('test', address)
+        #sock.sendto(resp, address)
 
     def echo_connection(self):
         while True:
@@ -238,8 +249,9 @@ class SocketHandler(object):
 
 class DnsWorker(Process, SocketHandler):
     """docstring for DnsWorker"""
-    def __init__(self, message_q, log_dir, log_level, group=None, target=None, name=None, args=(), kwargs={}):
+    def __init__(self, message_q, answer_q, log_dir, log_level, group=None, target=None, name=None, args=(), kwargs={}):
         self.message_q = message_q
+        self.answer_q = answer_q
         self.log_dir = log_dir
         self.log_level = log_level
 
@@ -262,6 +274,7 @@ class DnsServer:
         self.log_dir = log_dir
         self.log_level = log_level
         self.message_q = Queue(self.procs)
+        self.answer_q = Queue(self.procs)
 
     def stop_server(self):
         for proc_name, proc in self.proc_pool.iteritems():
@@ -273,7 +286,7 @@ class DnsServer:
 
     def start_worker_process(self):
         for i in range(self.procs):
-            proc = DnsWorker(self.message_q, self.log_dir, self.log_level, name='DnsWorker-%d' %i) 
+            proc = DnsWorker(self.message_q, self.answer_q, self.log_dir, self.log_level, name='DnsWorker-%d' %i) 
             self.proc_pool[proc.name] = proc
             proc.start()
 
@@ -290,6 +303,9 @@ class DnsServer:
             while True:
                 data, address = sock.recvfrom(1024)
                 self.message_q.put([data, address])
+                [resp, address] = self.answer_q.get()
+                sock.sendto(resp, address)
+
         except socket.error:
             self.stop_server()
         finally:
@@ -297,5 +313,5 @@ class DnsServer:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    server = DnsServer('localhost', 4553)
+    server = DnsServer('localhost', 53)
     server.run_forever()
