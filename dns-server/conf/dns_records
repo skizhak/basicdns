@@ -1,0 +1,11 @@
+#
+# Enter in following format
+#
+# Domain		Record Type		value
+#
+# as an example
+#
+testmachine1	A 				10.87.140.111
+testmachine2	CNAME			google.com
+testmachine3	A 				10.87.140.111
+test8 A 10.87.2.11 
