@@ -1,1 +1,2 @@
 wheel==0.22.0
+dnsypthon==1.11.1

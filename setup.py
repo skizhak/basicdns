@@ -31,7 +31,7 @@ setup(
     package_dir={'dns-server':
                  'dns-server'},
     include_package_data=True,
-    install_requires=[
+    install_requires=['dnspython>=1.11.1'
     ],
     license="BSD",
     zip_safe=False,
