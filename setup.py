@@ -18,24 +18,24 @@ readme = open('README.rst').read()
 history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
 setup(
-    name='dns-server',
+    name='basicdns',
     version='0.1.0',
     description='This is a simple multiprocess supported DNS server with basic feature set',
     long_description=readme + '\n\n' + history,
     author='Sarin Kizhakkepurayil',
     author_email='sarinkp@hotmail.com',
-    url='https://github.com/skizhak/dns-server',
+    url='https://github.com/skizhak/basicdns',
     packages=[
-        'dns-server',
+        'basicdns',
     ],
-    package_dir={'dns-server':
-                 'dns-server'},
+    package_dir={'basicdns':
+                 'basicdns'},
     include_package_data=True,
     install_requires=['dnspython>=1.11.1'
     ],
     license="BSD",
     zip_safe=False,
-    keywords='dns-server',
+    keywords='basicdns',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',

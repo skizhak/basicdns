@@ -2,18 +2,18 @@
 # -*- coding: utf-8 -*-
 
 """
-test_dns-server
+test_basicdns
 ----------------------------------
 
-Tests for `dns-server` module.
+Tests for `basicdns` module.
 """
 
 import unittest
 
-from dns-server import dns-server
+from basicdns import basicdns
 
 
-class TestDns-server(unittest.TestCase):
+class Testbasicdns(unittest.TestCase):
 
     def setUp(self):
         pass

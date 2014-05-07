@@ -9,3 +9,6 @@ testmachine1	A 				10.87.140.111
 testmachine2	CNAME			google.com
 testmachine3	A 				10.87.140.111
 test8 A 10.87.2.11 
+test9 A 10.87.2.11
+test10 A 10.87.2.11 
+test11 A 10.87.2.11 
