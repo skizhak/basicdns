@@ -9,7 +9,8 @@ python:
   - "pypy"
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
-install: pip install -r requirements.txt --use-mirrors
+install: 
+ - pip install -r requirements.txt --use-mirrors
  - wget http://www.dnspython.org/kits/1.11.1/dnspython-1.11.1.tar.gz
  - tar -xvzf dnspython-1.11.1.tar.gz
  - cd dnspython-1.11.1 && python setup.py install
